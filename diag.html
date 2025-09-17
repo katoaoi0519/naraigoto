@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>API 接続診断</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: system-ui, sans-serif; padding: 24px; }
+  pre { white-space: pre-wrap; border: 1px solid #ccc; padding: 12px; }
+</style>
+</head>
+<body>
+  <h1>API 接続診断</h1>
+  <p>CloudFront 経由で <code>/api/reviews?lessonId=L002</code> を叩いて結果を表示します。</p>
+  <pre id="diag">実行中...</pre>
+
+  <script>
+    (async function () {
+      const url = '/api/reviews?lessonId=L002&ts=' + Date.now(); // CF経由（相対パス）
+      const box = document.getElementById('diag');
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        box.textContent =
+          'status: ' + res.status +
+          '\ncontent-type: ' + (res.headers.get('content-type') || '-') +
+          '\nurl: ' + res.url +
+          '\n\n' + text;
+      } catch (e) {
+        box.textContent = 'fetch error: ' + e;
+      }
+    })();
+  </script>
+</body>
+</html>

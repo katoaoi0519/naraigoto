@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>習い事 Prime デモ</title>
+  <!-- 空のfaviconで 403 を回避 -->
+  <link rel="icon" href="data:,">
+  <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b0b10;
+      --card: #11131a;
+      --muted: #8b92a6;
+      --text: #e9ecf1;
+      --accent: #6ea8fe;
+      --ok: #2ecc71;
+      --warn: #ffb142;
+      --err: #ff6b6b;
+      --border: #1c2030;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 20% -10%, #1c2040 0%, #0b0b10 55%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      color: var(--text);
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 18px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo {
+      width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #6ea8fe, #8b5cf6);
+      box-shadow: var(--shadow);
+    }
+    h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+    .sub { color: var(--muted); font-size: 13px; }
+
+    .shell { display:grid; grid-template-columns: 320px 1fr; gap: 20px; }
+    @media (max-width: 900px){ .shell { grid-template-columns: 1fr; } }
+
+    .panel { background: rgba(17,19,26,.65); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+    .panel h2 { font-size: 14px; margin: 0 0 12px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+
+    .field { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; }
+    .field label { width: 86px; font-size: 13px; color: var(--muted); }
+    .field input, .field select, .field textarea {
+      width: 100%; background: #0f1220; color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; outline: none;
+    }
+    .row-btns { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 10px; }
+    .btn { appearance:none; border:none; border-radius: 12px; padding: 10px 14px; cursor:pointer; color:#fff; background:#1f2b4d; }
+    .btn:hover { filter: brightness(1.1); }
+    .btn.primary { background: linear-gradient(135deg, #6ea8fe, #8b5cf6); }
+    .btn.ok { background: #2b8a6e; }
+    .btn.ghost { background: transparent; border:1px solid var(--border); }
+
+    .lessons { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .card { background: rgba(17,19,26,.7); border: 1px solid var(--border); border-radius: 14px; padding: 12px; cursor:pointer; transition: transform .1s ease, border-color .15s ease; }
+    .card:hover { transform: translateY(-2px); border-color: #2b3350; }
+    .pill { display:inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border:1px solid var(--border); color: var(--muted); }
+    .id { font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; color:#aeb6d8; font-size:12px; }
+
+    .split { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    .reviews { display:flex; flex-direction:column; gap:10px; }
+    .rev { background:#0e1220; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    .stars { letter-spacing: 1px; color: #ffd166; }
+    .muted { color: var(--muted); }
+
+    .status { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; background:#0a0d18; border:1px solid var(--border); border-radius:10px; padding:10px; }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>習い事 Prime デモ</h1>
+          <div class="sub">CloudFront（/api/* → API Gateway）+ S3（OAC）</div>
+        </div>
+      </div>
+      <div class="sub">Tokyo Edge • Demo</div>
+    </header>
+
+    <div class="shell">
+      <!-- 左：操作パネル -->
+      <aside class="panel">
+        <h2>Control</h2>
+        <div class="field">
+          <label for="lessonSelect">レッスン</label>
+          <select id="lessonSelect"></select>
+        </div>
+        <div class="row-btns">
+          <button id="btnFetchReviews" class="btn primary">口コミを取得</button>
+          <button id="btnFetchDetail" class="btn">詳細を取得</button>
+          <button id="btnRefreshLessons" class="btn ghost">一覧を再取得</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border); margin:14px 0;">
+
+        <h2>レビュー投稿（デモ）</h2>
+        <div class="field"><label for="uid">ユーザーID</label><input id="uid" placeholder="例: demo-user" /></div>
+        <div class="field"><label for="rating">評価</label><input id="rating" type="number" min="1" max="5" value="5" /></div>
+        <div class="field"><label for="comment">コメント</label><textarea id="comment" rows="3" placeholder="とても良かった！"></textarea></div>
+        <div class="row-btns">
+          <button id="btnPostReview" class="btn ok">レビューを投稿</button>
+        </div>
+        <div id="status" class="status">Ready.</div>
+      </aside>
+
+      <!-- 右：表示領域 -->
+      <main class="split">
+        <section class="panel">
+          <h2>Lessons</h2>
+          <div id="lessons" class="lessons"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Lesson Detail</h2>
+          <div id="detail" class="mono">選択したレッスンの詳細が表示されます。</div>
+        </section>
+
+        <section class="panel">
+          <h2>Reviews</h2>
+          <div id="reviews" class="reviews"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // ===== API helpers (CloudFront経由, 相対パス) =====
+    function apiGet(path, params){
+      return $.ajax({ method:'GET', url: '/api'+path, data: params, dataType:'json' });
+    }
+    function apiPost(path, body){
+      return $.ajax({ method:'POST', url:'/api'+path, data: JSON.stringify(body), contentType:'application/json; charset=utf-8', dataType:'json' });
+    }
+
+    // ===== UI helpers =====
+    function setStatus(msg, cls){ $('#status').text(msg).removeClass('ok err').addClass(cls||''); }
+    function starify(n){ n = Number(n)||0; return '★'.repeat(n) + '☆'.repeat(Math.max(0,5-n)); }
+
+    // ===== Data flows =====
+    async function loadLessons(){
+      setStatus('レッスン一覧を取得中…');
+      try{
+        const data = await apiGet('/lessons');
+        renderLessons(data);
+        // セレクトにも反映
+        const $sel = $('#lessonSelect').empty();
+        data.forEach(x=>{
+          const opt = $('<option>').val(x.lessonId).text(`${x.title} ／ ${x.area} ／ ${x.genre} ／ ID:${x.lessonId}`);
+          $sel.append(opt);
+        });
+        setStatus('レッスン一覧を更新しました。','ok');
+      }catch(e){ setStatus('レッスン取得に失敗しました。','err'); console.error(e); }
+    }
+
+    function renderLessons(items){
+      const $wrap = $('#lessons').empty();
+      if(!Array.isArray(items) || items.length===0){ $wrap.append($('<div>').addClass('muted').text('レッスンがありません。')); return; }
+      items.forEach(x=>{
+        const $c = $('<div>').addClass('card').attr('tabindex',0);
+        $c.append($('<div>').addClass('pill').text(x.genre || '—'));
+        $c.append($('<div>').css('margin-top','6px').text(x.title));
+        $c.append($('<div>').addClass('muted').text(x.area));
+        $c.append($('<div>').addClass('id').text(`ID: ${x.lessonId}`));
+        $c.on('click keypress', (ev)=>{ if(ev.type==='click' || ev.key==='Enter'){ selectLesson(x.lessonId); } });
+        $wrap.append($c);
+      });
+    }
+
+    async function selectLesson(lessonId){
+      $('#lessonSelect').val(lessonId);
+      await Promise.all([ loadDetail(lessonId), loadReviews(lessonId) ]);
+    }
+
+    async function loadDetail(lessonId){
+      setStatus(`詳細取得中… (ID=${lessonId})`);
+      try{
+        const data = await apiGet('/'+encodeURIComponent(lessonId));
+        $('#detail').text(JSON.stringify(data, null, 2));
+        setStatus('詳細を表示しました。','ok');
+      }catch(e){
+        $('#detail').text('取得に失敗しました。');
+        setStatus('詳細の取得に失敗しました。','err'); console.error(e);
+      }
+    }
+
+    async function loadReviews(lessonId){
+      setStatus(`口コミ取得中… (lessonId=${lessonId})`);
+      try{
+        const data = await apiGet('/reviews', { lessonId });
+        const arr = Array.isArray(data) ? data : (data.reviews || []);
+        const $wrap = $('#reviews').empty();
+        if(arr.length===0){ $wrap.append($('<div>').addClass('muted').text('まだ口コミがありません。')); }
+        arr.forEach(r=>{
+          const $r = $('<div>').addClass('rev');
+          $r.append($('<div>').addClass('stars').text(starify(r.rating)));
+          $r.append($('<div>').text(r.comment || ''));
+          $r.append($('<div>').addClass('muted').text(`by ${r.userId || 'anonymous'} ／ lessonId ${r.lessonId}`));
+          $wrap.append($r);
+        });
+        setStatus('口コミを表示しました。','ok');
+      }catch(e){ setStatus('口コミ取得に失敗しました。','err'); console.error(e); }
+    }
+
+    async function postReview(){
+      const lessonId = $('#lessonSelect').val();
+      const userId = ($('#uid').val()||'').trim() || 'demo-user';
+      const rating = Number($('#rating').val()||5);
+      const comment = ($('#comment').val()||'').trim() || 'とても良かった！';
+      setStatus('レビューを送信中…');
+      try{
+        const res = await apiPost('/reviews', { lessonId, userId, rating, comment });
+        setStatus('レビューを投稿しました。','ok');
+        await loadReviews(lessonId);
+      }catch(e){ setStatus('レビュー投稿に失敗しました。','err'); console.error(e); }
+    }
+
+    // ===== Bindings =====
+    $(function(){
+      loadLessons().then(()=>{
+        const first = $('#lessonSelect').val();
+        if(first) selectLesson(first);
+      });
+      $('#btnRefreshLessons').on('click', ()=> loadLessons());
+      $('#btnFetchDetail').on('click', ()=> { const id=$('#lessonSelect').val(); if(id) loadDetail(id); });
+      $('#btnFetchReviews').on('click', ()=> { const id=$('#lessonSelect').val(); if(id) loadReviews(id); });
+      $('#btnPostReview').on('click', postReview);
+    });
+  </script>
+</body>
+</html>
+
+
