@@ -181,43 +181,43 @@ REST主要エンドポイント（Tech準拠・例） [未着手]
 
 ---
 
-## フロントエンド: 必要ページ一覧とレンダリング方式 [未着手]
+## フロントエンド: 必要ページ一覧とレンダリング方式 [完了]
 
-公開（未認証。SSG/ISR）
-- `/` ホーム・検索導線（SSG + CSRで検索UI）
-- `/schools` 教室一覧（ISR）
-- `/schools/[id]` 教室詳細（ISR）
-- `/instructors/[id]` 先生詳細（ISR）
-- `/classes` クラス検索（ISR）
-- `/classes/[id]` クラス詳細（ISR）
-- `/pricing` 料金/プラン（SSG）
-- `/faq` よくある質問（SSG）
-- `/about` 事業紹介（SSG）
+公開（未認証。SSG/ISR） [完了]
+- `/` ホーム・検索導線（SSG + CSRで検索UI） [完了]
+- `/schools` 教室一覧（ISR） [完了]
+- `/schools/[id]` 教室詳細（ISR） [完了]
+- `/instructors/[id]` 先生詳細（ISR） [完了]
+- `/classes` クラス検索（ISR） [完了]
+- `/classes/[id]` クラス詳細（ISR） [完了]
+- `/pricing` 料金/プラン（SSG） [完了]
+- `/faq` よくある質問（SSG） [完了]
+- `/about` 事業紹介（SSG） [完了]
 
-認証/オンボーディング（Hosted UI遷移/CSR） [未着手]
-- `/auth/login`（Hosted UIへ誘導リンク）
-- `/auth/callback`（CSR/SSRいずれか。JWT受領・初期プロビジョニング）
-- `/onboarding` 初回設定（CSR）
+認証/オンボーディング（Hosted UI遷移/CSR） [完了]
+- `/auth/login`（Hosted UIへ誘導リンク） [完了]
+- `/auth/callback`（CSR/SSRいずれか。JWT受領・初期プロビジョニング） [完了]
+- `/onboarding` 初回設定（CSR） [完了]
 
-保護（親/子。CSRガード） [未着手]
-- `/me` ダッシュボード（CSR）
-- `/me/tickets` チケット残高（CSR）
-- `/me/bookings` 予約一覧（CSR）
-- `/me/bookings/[id]` 予約詳細（CSR）
-- `/me/reviews/new` 口コミ投稿（CSR）
-- `/me/likes` いいね（CSR）
-- `/me/points` ポイント（CSR）
-- `/me/referrals` 紹介（CSR）
+保護（親/子。CSRガード） [完了]
+- `/me` ダッシュボード（CSR） [完了]
+- `/me/tickets` チケット残高（CSR） [完了]
+- `/me/bookings` 予約一覧（CSR） [完了]
+- `/me/bookings/[id]` 予約詳細（CSR） [完了]
+- `/me/reviews/new` 口コミ投稿（CSR） [完了]
+- `/me/likes` いいね（CSR） [完了]
+- `/me/points` ポイント（CSR） [完了]
+- `/me/referrals` 紹介（CSR） [完了]
 
-教室オーナー（保護/CSR）
-- `/owner/dashboard` 概況（CSR）
-- `/owner/classes` クラス管理（CSR）
-- `/owner/schedules` 開催枠管理（CSR）
-- `/owner/attendances` 出欠確定（CSR）
+教室オーナー（保護/CSR） [完了]
+- `/owner/dashboard` 概況（CSR） [完了]
+- `/owner/classes` クラス管理（CSR） [完了]
+- `/owner/schedules` 開催枠管理（CSR） [完了]
+- `/owner/attendances` 出欠確定（CSR） [完了]
 
-メッセージ（保護/CSR + WebSocket） [未着手]
-- `/conversations` スレッド一覧（CSR）
-- `/conversations/[id]` 会話（CSR + WS）
+メッセージ（保護/CSR + WebSocket） [完了]
+- `/conversations` スレッド一覧（CSR） [完了]
+- `/conversations/[id]` 会話（CSR + WS） [完了]
 
 補足
 - 公開ページは SSG/ISR で高速表示とSEO。

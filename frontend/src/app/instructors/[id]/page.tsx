@@ -2,6 +2,7 @@ interface Props {
   params: { id: string };
 }
 
+
 export default function InstructorDetailPage({ params }: Props) {
   return (
     <div>

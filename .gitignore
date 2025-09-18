@@ -203,3 +203,5 @@ Thumbs.db
 *.exe
 *.o
 *.so
+
+ENV_SETUP.md

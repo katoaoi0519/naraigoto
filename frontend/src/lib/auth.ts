@@ -1,127 +1,309 @@
-// Minimal Cognito Hosted UI + PKCE helpers for CSR pages
-// For environments where node types are not picked up during lint
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const process: any;
+import { COGNITO_CONFIG, STORAGE_KEYS, API_CONFIG, API_ENDPOINTS } from './config';
+import { getLocalStorageItem, setLocalStorageItem } from './utils';
 
-export type CognitoTokens = {
+/**
+ * Cognito認証ユーティリティ
+ */
+
+/**
+ * Cognito Hosted UI のログインURLを生成
+ */
+export function buildLoginUrl(userType?: 'parent' | 'child'): string {
+  const params = new URLSearchParams({
+    client_id: COGNITO_CONFIG.CLIENT_ID,
+    response_type: 'code',
+    scope: COGNITO_CONFIG.SCOPES.join(' '),
+    redirect_uri: COGNITO_CONFIG.REDIRECT_URI,
+  });
+
+  // ユーザータイプを状態として渡す
+  if (userType) {
+    params.append('state', JSON.stringify({ userType }));
+  }
+
+  return `https://${COGNITO_CONFIG.DOMAIN}/login?${params.toString()}`;
+}
+
+/**
+ * Cognito Hosted UI のログアウトURLを生成
+ */
+export function buildLogoutUrl(): string {
+  const params = new URLSearchParams({
+    client_id: COGNITO_CONFIG.CLIENT_ID,
+    logout_uri: COGNITO_CONFIG.LOGOUT_REDIRECT_URI,
+  });
+
+  return `https://${COGNITO_CONFIG.DOMAIN}/logout?${params.toString()}`;
+}
+
+/**
+ * 認証コードをトークンに交換
+ */
+export async function exchangeCodeForTokens(code: string): Promise<{
+  id_token: string;
+  access_token: string;
+  refresh_token: string;
+}> {
+  const response = await fetch(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.CALLBACK}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code,
+      client_id: COGNITO_CONFIG.CLIENT_ID,
+      redirect_uri: COGNITO_CONFIG.REDIRECT_URI,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Token exchange failed' }));
+    throw new Error(error.message || 'トークン交換に失敗しました');
+  }
+
+  return response.json();
+}
+
+/**
+ * リフレッシュトークンを使用してアクセストークンを更新
+ */
+export async function refreshAccessToken(refreshToken: string): Promise<{
+  id_token: string;
+  access_token: string;
+}> {
+  const response = await fetch(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+      client_id: COGNITO_CONFIG.CLIENT_ID,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('トークンの更新に失敗しました');
+  }
+
+  return response.json();
+}
+
+/**
+ * JWTトークンをデコード（簡易版）
+ */
+export function decodeJWT(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('JWT decode error:', error);
+    return null;
+  }
+}
+
+/**
+ * トークンの有効性をチェック
+ */
+export function isTokenValid(token: string): boolean {
+  try {
+    const decoded = decodeJWT(token);
+    if (!decoded || !decoded.exp) return false;
+    
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp > currentTime;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * ローカルストレージからトークンを取得
+ */
+export function getStoredTokens(): {
+  idToken: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+} {
+  return {
+    idToken: getLocalStorageItem(STORAGE_KEYS.ID_TOKEN),
+    accessToken: getLocalStorageItem(STORAGE_KEYS.ACCESS_TOKEN),
+    refreshToken: getLocalStorageItem(STORAGE_KEYS.REFRESH_TOKEN),
+  };
+}
+
+/**
+ * トークンをローカルストレージに保存
+ */
+export function storeTokens(tokens: {
   id_token: string;
   access_token: string;
   refresh_token?: string;
-  expires_in: number;
-  token_type: string;
-};
-
-const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || '';
-const COGNITO_CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '';
-const COGNITO_REDIRECT_URI = process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI || '';
-const COGNITO_LOGOUT_REDIRECT_URI = process.env.NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI || COGNITO_REDIRECT_URI || '';
-
-const STORAGE_PKCE_VERIFIER = 'auth.pkce_verifier';
-const STORAGE_AUTH_STATE = 'auth.state';
-
-function toBase64Url(input: ArrayBuffer): string {
-  const bytes = new Uint8Array(input);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  if (typeof window === 'undefined' || typeof btoa === 'undefined') {
-    throw new Error('Base64 encoding requires a browser environment.');
+}): void {
+  setLocalStorageItem(STORAGE_KEYS.ID_TOKEN, tokens.id_token);
+  setLocalStorageItem(STORAGE_KEYS.ACCESS_TOKEN, tokens.access_token);
+  
+  if (tokens.refresh_token) {
+    setLocalStorageItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
   }
-  const base64 = btoa(binary);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
-export async function generateCodeVerifier(): Promise<string> {
-  const random = crypto.getRandomValues(new Uint8Array(32));
-  return toBase64Url(random.buffer);
-}
-
-export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return toBase64Url(digest);
-}
-
-export function generateState(): string {
-  const random = crypto.getRandomValues(new Uint8Array(16));
-  return toBase64Url(random.buffer);
-}
-
-export function storePkce(verifier: string, state: string) {
-  if (typeof window === 'undefined') return;
-  sessionStorage.setItem(STORAGE_PKCE_VERIFIER, verifier);
-  sessionStorage.setItem(STORAGE_AUTH_STATE, state);
-}
-
-export function readAndClearPkce(): { verifier?: string; state?: string } {
-  if (typeof window === 'undefined') return {};
-  const verifier = sessionStorage.getItem(STORAGE_PKCE_VERIFIER) || undefined;
-  const state = sessionStorage.getItem(STORAGE_AUTH_STATE) || undefined;
-  sessionStorage.removeItem(STORAGE_PKCE_VERIFIER);
-  sessionStorage.removeItem(STORAGE_AUTH_STATE);
-  return { verifier, state };
-}
-
-export function buildLoginUrl(codeChallenge: string, state: string): string {
-  const base = `${COGNITO_DOMAIN}/oauth2/authorize`;
-  const params = new URLSearchParams({
-    client_id: COGNITO_CLIENT_ID,
-    response_type: 'code',
-    scope: 'openid email profile',
-    redirect_uri: COGNITO_REDIRECT_URI,
-    code_challenge_method: 'S256',
-    code_challenge: codeChallenge,
-    state,
-  });
-  return `${base}?${params.toString()}`;
-}
-
-export function buildLogoutUrl(): string {
-  const base = `${COGNITO_DOMAIN}/logout`;
-  const params = new URLSearchParams({
-    client_id: COGNITO_CLIENT_ID,
-    logout_uri: COGNITO_LOGOUT_REDIRECT_URI,
-    response_type: 'code',
-  });
-  return `${base}?${params.toString()}`;
-}
-
-export async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<CognitoTokens> {
-  const tokenEndpoint = `${COGNITO_DOMAIN}/oauth2/token`;
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: COGNITO_CLIENT_ID,
-    code,
-    redirect_uri: COGNITO_REDIRECT_URI,
-    code_verifier: codeVerifier,
-  });
-
-  const res = await fetch(tokenEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Token exchange failed: ${res.status} ${text}`);
+  // ユーザー情報をJWTから抽出して保存
+  const userInfo = decodeJWT(tokens.id_token);
+  if (userInfo) {
+    setLocalStorageItem(STORAGE_KEYS.USER_ID, userInfo.sub || '');
+    setLocalStorageItem(STORAGE_KEYS.USER_NAME, userInfo.name || '');
+    setLocalStorageItem(STORAGE_KEYS.USER_EMAIL, userInfo.email || '');
+    
+    // カスタムクレームからユーザータイプを取得
+    if (userInfo['custom:user_type']) {
+      setLocalStorageItem(STORAGE_KEYS.USER_TYPE, userInfo['custom:user_type']);
+    }
   }
-  return res.json();
 }
 
-export function saveTokens(tokens: CognitoTokens) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('id_token', tokens.id_token);
-  localStorage.setItem('access_token', tokens.access_token);
-  if (tokens.refresh_token) localStorage.setItem('refresh_token', tokens.refresh_token);
-  localStorage.setItem('token_expires_at', String(Date.now() + tokens.expires_in * 1000));
+/**
+ * 全てのトークンをクリア
+ */
+export function clearTokens(): void {
+  const keysToRemove = [
+    STORAGE_KEYS.ID_TOKEN,
+    STORAGE_KEYS.ACCESS_TOKEN,
+    STORAGE_KEYS.REFRESH_TOKEN,
+    STORAGE_KEYS.USER_ID,
+    STORAGE_KEYS.USER_NAME,
+    STORAGE_KEYS.USER_EMAIL,
+    STORAGE_KEYS.USER_TYPE,
+  ];
+
+  keysToRemove.forEach(key => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(key);
+    }
+  });
 }
 
-export function clearTokens() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('id_token');
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('token_expires_at');
+/**
+ * 現在のユーザー情報を取得
+ */
+export function getCurrentUser(): {
+  id: string;
+  name: string;
+  email: string;
+  type: string;
+} | null {
+  const userId = getLocalStorageItem(STORAGE_KEYS.USER_ID);
+  const userName = getLocalStorageItem(STORAGE_KEYS.USER_NAME);
+  const userEmail = getLocalStorageItem(STORAGE_KEYS.USER_EMAIL);
+  const userType = getLocalStorageItem(STORAGE_KEYS.USER_TYPE);
+
+  if (!userId || !userName) {
+    return null;
+  }
+
+  return {
+    id: userId,
+    name: userName,
+    email: userEmail,
+    type: userType || 'parent',
+  };
 }
 
+/**
+ * ログイン状態をチェック
+ */
+export function isAuthenticated(): boolean {
+  const { idToken } = getStoredTokens();
+  return idToken ? isTokenValid(idToken) : false;
+}
 
+/**
+ * 認証が必要なAPIリクエスト用のヘッダーを生成
+ */
+export function getAuthHeaders(): HeadersInit {
+  const { accessToken } = getStoredTokens();
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (accessToken && isTokenValid(accessToken)) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+}
+
+/**
+ * 自動的にトークンを更新するAPIリクエスト関数
+ */
+export async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const { accessToken, refreshToken } = getStoredTokens();
+
+  // アクセストークンが有効な場合はそのまま使用
+  if (accessToken && isTokenValid(accessToken)) {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        ...getAuthHeaders(),
+      },
+    });
+  }
+
+  // リフレッシュトークンがある場合は更新を試行
+  if (refreshToken && isTokenValid(refreshToken)) {
+    try {
+      const newTokens = await refreshAccessToken(refreshToken);
+      storeTokens({
+        id_token: newTokens.id_token,
+        access_token: newTokens.access_token,
+      });
+
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${newTokens.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      clearTokens();
+      throw new Error('認証が必要です。再度ログインしてください。');
+    }
+  }
+
+  throw new Error('認証が必要です。ログインしてください。');
+}
+
+/**
+ * ログアウト処理
+ */
+export async function logout(): Promise<void> {
+  try {
+    // サーバーサイドでのログアウト処理
+    await fetch(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.LOGOUT}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+  } catch (error) {
+    console.error('Server logout failed:', error);
+  } finally {
+    // ローカルのトークンをクリア
+    clearTokens();
+    
+    // Cognito Hosted UIのログアウトページにリダイレクト
+    window.location.href = buildLogoutUrl();
+  }
+}

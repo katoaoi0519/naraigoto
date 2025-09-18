@@ -1,102 +1,157 @@
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+import { API_CONFIG, API_ENDPOINTS } from './config';
+import { authenticatedFetch } from './auth';
+import { getErrorMessage } from './utils';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+/**
+ * APIクライアント
+ */
 
-export async function apiFetch<T>(path: string, options?: { method?: HttpMethod; body?: unknown; token?: string; cacheSeconds?: number; }): Promise<T> {
-  const url = `${API_BASE_URL}${path}`;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (options?.token) headers['Authorization'] = `Bearer ${options.token}`;
-  const res = await fetch(url, {
-    method: options?.method || 'GET',
-    headers,
-    body: options?.body ? JSON.stringify(options.body) : undefined,
-    next: { revalidate: options?.cacheSeconds ?? 60 },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
+export interface ApiResponse<T = any> {
+  data: T;
+  message?: string;
+  success: boolean;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  return res.json();
 }
 
-// High-level wrappers (adjust paths to your API mapping as needed)
-
-export async function getLessons() {
-  return apiFetch<any[]>(`/lessons`, { cacheSeconds: 30 });
-}
-
-export async function getLessonById(lessonId: string) {
-  return apiFetch<any>(`/lessons/${encodeURIComponent(lessonId)}`, { cacheSeconds: 30 });
-}
-
-export async function getReviewsByLesson(lessonId: string) {
-  // Preferred unified route
+async function baseFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  
   try {
-    return await apiFetch<any>(`/lessons/${encodeURIComponent(lessonId)}/reviews`, { cacheSeconds: 10 });
-  } catch (_) {
-    // Fallback to legacy lambda that uses lessonsId query
-    return apiFetch<any>(`/reviews?lessonsId=${encodeURIComponent(lessonId)}`, { cacheSeconds: 10 });
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(
+        errorData.message || `HTTP ${response.status}`,
+        response.status,
+        errorData.code
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(getErrorMessage(error), 500);
   }
 }
 
-export async function getReviewsByTarget(targetType: 'school' | 'instructor', targetId: string) {
-  // Preferred route
+async function authFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  
   try {
-    return await apiFetch<any>(`/reviews/by-target?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`, { cacheSeconds: 10 });
-  } catch (_) {
-    // Fallback to lambda name style
-    return apiFetch<any>(`/get_reviews_by_target?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`, { cacheSeconds: 10 });
+    const response = await authenticatedFetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(
+        errorData.message || `HTTP ${response.status}`,
+        response.status,
+        errorData.code
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(getErrorMessage(error), 500);
   }
 }
 
-export async function postReview(input: { lessonsId: string; userId: string; rating: number; comment: string; role: 'parent' | 'child'; }) {
-  // Preferred route
-  try {
-    return await apiFetch<any>(`/reviews`, { method: 'POST', body: input });
-  } catch (_) {
-    return apiFetch<any>(`/post_reviews`, { method: 'POST', body: input });
-  }
-}
+// 教室API
+export const schoolsApi = {
+  async list(params?: {
+    page?: number;
+    limit?: number;
+    area?: string;
+    category?: string;
+    keyword?: string;
+    sort?: string;
+  }): Promise<ApiResponse<any[]>> {
+    const searchParams = new URLSearchParams();
+    
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.area) searchParams.append('area', params.area);
+    if (params?.category) searchParams.append('category', params.category);
+    if (params?.keyword) searchParams.append('keyword', params.keyword);
+    if (params?.sort) searchParams.append('sort', params.sort);
 
-export async function likeSchool(userId: string, schoolId: string) {
-  return apiFetch<any>(`/likes`, { method: 'POST', body: { userId, schoolId } });
-}
+    const query = searchParams.toString();
+    const endpoint = `${API_ENDPOINTS.SCHOOLS.LIST}${query ? `?${query}` : ''}`;
+    
+    return baseFetch(endpoint);
+  },
 
-export async function unlikeSchool(userId: string, schoolId: string) {
-  try {
-    return await apiFetch<any>(`/likes/${encodeURIComponent(userId)}/${encodeURIComponent(schoolId)}`, { method: 'DELETE' });
-  } catch (_) {
-    return apiFetch<any>(`/likes`, { method: 'DELETE', body: { userId, schoolId } });
-  }
-}
+  async getById(id: string): Promise<ApiResponse<any>> {
+    return baseFetch(API_ENDPOINTS.SCHOOLS.DETAIL(id));
+  },
 
-export async function listLikesByUser(userId: string) {
-  try {
-    return await apiFetch<any>(`/likes/user/${encodeURIComponent(userId)}`, { cacheSeconds: 10 });
-  } catch (_) {
-    return apiFetch<any>(`/likes?userId=${encodeURIComponent(userId)}`, { cacheSeconds: 10 });
-  }
-}
+  async like(id: string): Promise<ApiResponse<void>> {
+    return authFetch(API_ENDPOINTS.SCHOOLS.LIKE(id), { method: 'POST' });
+  },
 
-export async function getMyBookings(userId: string) {
-  try {
-    return await apiFetch<any>(`/my/bookings?userId=${encodeURIComponent(userId)}`, { cacheSeconds: 5 });
-  } catch (_) {
-    return apiFetch<any>(`/bookings?userId=${encodeURIComponent(userId)}`, { cacheSeconds: 5 });
-  }
-}
+  async unlike(id: string): Promise<ApiResponse<void>> {
+    return authFetch(API_ENDPOINTS.SCHOOLS.LIKE(id), { method: 'DELETE' });
+  },
+};
 
-export async function createBooking(input: { userId: string; lessonId: string; schedule?: string; consumedTickets?: number; }) {
-  return apiFetch<any>(`/bookings`, { method: 'POST', body: input });
-}
+// 予約API
+export const bookingsApi = {
+  async create(data: {
+    scheduleId: string;
+    userId: string;
+    consumedTickets: number;
+  }): Promise<ApiResponse<any>> {
+    return authFetch(API_ENDPOINTS.BOOKINGS.CREATE, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 
-export async function cancelBooking(bookingId: string) {
-  try {
-    return await apiFetch<any>(`/bookings/${encodeURIComponent(bookingId)}/cancel`, { method: 'POST' });
-  } catch (_) {
-    return apiFetch<any>(`/cancel_booking/${encodeURIComponent(bookingId)}`, { method: 'POST' });
-  }
-}
+  async cancel(id: string): Promise<ApiResponse<void>> {
+    return authFetch(API_ENDPOINTS.BOOKINGS.CANCEL(id), { method: 'POST' });
+  },
+};
 
+// ユーザーAPI
+export const userApi = {
+  async getProfile(): Promise<ApiResponse<any>> {
+    return authFetch(API_ENDPOINTS.USER.PROFILE);
+  },
 
-
+  async getTickets(): Promise<ApiResponse<any>> {
+    return authFetch(API_ENDPOINTS.USER.TICKETS);
+  },
+};
