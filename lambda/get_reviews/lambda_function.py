@@ -13,6 +13,13 @@ child_table  = dynamodb.Table(CHILD_TBL)
 PARAM_NAME   = 'lessonsId'
 DDB_KEY_NAME = 'lessonsId'
 
+HEADERS = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "content-type,authorization,x-api-key",
+    "Access-Control-Allow-Methods": "GET,OPTIONS"
+}
+
 def _decimal_to_native(obj):
     """dict/listを再帰的に走査し、Decimalをint/floatへ変換"""
     if isinstance(obj, list):
@@ -29,11 +36,18 @@ def _res(code, body):
     safe_body = _decimal_to_native(body)
     return {
         "statusCode": code,
-        "headers": {"Content-Type": "application/json; charset=utf-8"},
+        "headers": HEADERS,
         "body": json.dumps(safe_body, ensure_ascii=False)
     }
 
 def _get_param(event):
+    # pathParameters 優先（/lessons/{lessonId}/reviews など）
+    pp = event.get("pathParameters") or {}
+    if isinstance(pp, dict):
+        if pp.get("lessonId"):
+            return pp["lessonId"]
+        if pp.get(PARAM_NAME):
+            return pp[PARAM_NAME]
     qs = event.get("queryStringParameters") or {}
     if isinstance(qs, dict) and PARAM_NAME in qs:
         return qs[PARAM_NAME]
@@ -56,6 +70,10 @@ def _query_latest(table, lessons_id, limit=20):
     return resp.get('Items', [])
 
 def lambda_handler(event, _ctx):
+    method = (event.get("requestContext") or {}).get("http", {}).get("method", "GET").upper()
+    if method == "OPTIONS":
+        return {"statusCode": 204, "headers": HEADERS, "body": ""}
+
     lessons_id = _get_param(event)
     if not lessons_id:
         return _res(400, {"error": f"{PARAM_NAME} required"})
@@ -67,7 +85,6 @@ def lambda_handler(event, _ctx):
     except Exception as e:
         print(f"[get_reviews] error: {e}")
         return _res(500, {"error": "internal_error", "message": str(e)})
-
 
 
 

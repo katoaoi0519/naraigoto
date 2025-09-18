@@ -1,0 +1,23 @@
+{
+  "TableName": "Likes",
+  "BillingMode": "PAY_PER_REQUEST",
+  "AttributeDefinitions": [
+    { "AttributeName": "userId", "AttributeType": "S" },
+    { "AttributeName": "schoolId", "AttributeType": "S" }
+  ],
+  "KeySchema": [
+    { "AttributeName": "userId", "KeyType": "HASH" },
+    { "AttributeName": "schoolId", "KeyType": "RANGE" }
+  ],
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "bySchool",
+      "KeySchema": [
+        { "AttributeName": "schoolId", "KeyType": "HASH" }
+      ],
+      "Projection": { "ProjectionType": "ALL" }
+    }
+  ]
+}
+
+

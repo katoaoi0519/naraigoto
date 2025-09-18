@@ -21,14 +21,15 @@ def _decimal_to_native(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
 
+HEADERS = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS,POST",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,x-api-key"
+}
+
 def _res(code, body, cors=True):
-    headers = {"Content-Type": "application/json; charset=utf-8"}
-    if cors:
-        headers.update({
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "OPTIONS,POST",
-            "Access-Control-Allow-Headers": "Content-Type,Authorization"
-        })
+    headers = HEADERS if cors else {"Content-Type": "application/json; charset=utf-8"}
     try:
         body_json = json.dumps(_decimal_to_native(body), ensure_ascii=False)
     except Exception as e:
@@ -110,8 +111,9 @@ def lambda_handler(event, _ctx):
         child_table  = dynamodb.Table(child_tbl_name)
 
         # 事前フライト（必要なら）
-        if event.get("httpMethod") == "OPTIONS":
-            return _res(200, {"ok": True})
+        method = (event.get("requestContext") or {}).get("http", {}).get("method") or event.get("httpMethod")
+        if method and method.upper() == "OPTIONS":
+            return {"statusCode": 204, "headers": HEADERS, "body": ""}
 
         payload = _parse_body(event)
         if not payload or not isinstance(payload, dict):

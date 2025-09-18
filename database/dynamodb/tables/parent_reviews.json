@@ -1,0 +1,25 @@
+{
+  "TableName": "ParentReviews",
+  "BillingMode": "PAY_PER_REQUEST",
+  "AttributeDefinitions": [
+    { "AttributeName": "lessonsId", "AttributeType": "S" },
+    { "AttributeName": "createdAt", "AttributeType": "S" },
+    { "AttributeName": "targetKey", "AttributeType": "S" }
+  ],
+  "KeySchema": [
+    { "AttributeName": "lessonsId", "KeyType": "HASH" },
+    { "AttributeName": "createdAt", "KeyType": "RANGE" }
+  ],
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "byTarget",
+      "KeySchema": [
+        { "AttributeName": "targetKey", "KeyType": "HASH" },
+        { "AttributeName": "createdAt", "KeyType": "RANGE" }
+      ],
+      "Projection": { "ProjectionType": "ALL" }
+    }
+  ]
+}
+
+
