@@ -5,6 +5,10 @@
     --err: #dc2626;
     --border: #e5e7eb;
     --shadow: 0 8px 24px rgba(0,0,0,.08);
+    --bg: #f7f8fb;
+    --text: #0f172a;
+    --muted: #64748b;
+    --card: #ffffff;
     }
     html, body { height: 100%; }
     body {

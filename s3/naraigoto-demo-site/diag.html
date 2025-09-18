@@ -11,12 +11,12 @@
 </head>
 <body>
   <h1>API 接続診断</h1>
-  <p>CloudFront 経由で <code>/api/reviews?lessonId=L002</code> を叩いて結果を表示します。</p>
+  <p>CloudFront 経由で <code>/api/reviews?lessonsId=L002</code> を叩いて結果を表示します。</p>
   <pre id="diag">実行中...</pre>
 
   <script>
     (async function () {
-      const url = '/api/reviews?lessonId=L002&ts=' + Date.now(); // CF経由（相対パス）
+      const url = '/api/reviews?lessonsId=L002&ts=' + Date.now(); // CF経由（相対パス）
       const box = document.getElementById('diag');
       try {
         const res = await fetch(url);

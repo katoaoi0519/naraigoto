@@ -1,34 +1,27 @@
 {
-  "lessonId":  {"S": "L002"},                       // PK
-  "createdAt": {"S": "2025-09-18T13:02:11.102Z"},   // SK
-  "reviewId":  {"S": "7f0a8a7f-9a0c-4cb6-9932-1b2f2d3e4f55"},
-  "userId":    {"S": "parent_u5"},
-  "rating":    {"N": "5"},
-  "comment":   {"S": "ダンスが楽しい！講師の方が親切でした。"},
-  "role":      {"S": "parent"}
-}
-
-{
-    "lessonId":  {"S": "L002"},
-    "createdAt": {"S": "2025-09-18T13:05:00.001Z"},
-    "reviewId":  {"S": "3a5e0b54-3a4a-49f6-9a1a-9c8f1c2f3d4e"},
-    "userId":    {"S": "child_u9"},
-    "rating":    {"N": "4"},
-    "comment":   {"S": "先生がやさしくて、また行きたい！"},
-    "role":      {"S": "child"}
-  }
-  
-  {
-    "lessonsId": {
-      "S": "L002"
-    },
-    "area": {
-      "S": "杉並"
-    },
-    "genre": {
-      "S": "dance"
-    },
-    "title": {
-      "S": "はじめてのダンス"
+  "lessons": [
+    { "lessonId": "L002", "title": "はじめてのダンス", "area": "杉並", "genre": "dance" }
+  ],
+  "reviews_parent": [
+    {
+      "id": "7f0a8a7f-9a0c-4cb6-9932-1b2f2d3e4f55",
+      "booking_id": "B-001",
+      "target_type": "school",
+      "target_id": "L002",
+      "rating": 5,
+      "comment": "ダンスが楽しい！講師の方が親切でした。",
+      "created_at": "2025-09-18T13:02:11.102Z"
     }
-  }
+  ],
+  "reviews_child": [
+    {
+      "id": "3a5e0b54-3a4a-49f6-9a1a-9c8f1c2f3d4e",
+      "booking_id": "B-002",
+      "target_type": "school",
+      "target_id": "L002",
+      "rating": 4,
+      "comment": "先生がやさしくて、また行きたい！",
+      "created_at": "2025-09-18T13:05:00.001Z"
+    }
+  ]
+}
